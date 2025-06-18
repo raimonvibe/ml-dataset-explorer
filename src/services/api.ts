@@ -43,6 +43,19 @@ export interface TinyImageNetStats {
   }>;
 }
 
+export interface UploadResponse {
+  message: string;
+  uploads: Array<{
+    upload_id: string;
+    original_filename: string;
+    stored_filename: string;
+    category: string;
+    file_size: number;
+    processing_status: string;
+    analysis_results: any;
+  }>;
+}
+
 class ApiService {
   private async fetchApi(endpoint: string) {
     const response = await fetch(`${API_BASE_URL}${endpoint}`);
@@ -88,7 +101,7 @@ class ApiService {
     return this.fetchApi(`/datasets/kitti/frames/${sequenceId}?limit=${limit}&offset=${offset}`);
   }
 
-  async uploadFiles(category: string, files: FileList) {
+  async uploadFiles(category: string, files: FileList): Promise<UploadResponse> {
     const formData = new FormData();
     Array.from(files).forEach(file => {
       formData.append('files', file);

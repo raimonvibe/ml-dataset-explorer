@@ -21,7 +21,9 @@ import {
   Loader2
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { apiService, type ChestXrayStats, type TinyImageNetStats } from './services/api'
+import { apiService, type ChestXrayStats, type TinyImageNetStats, type UploadResponse } from './services/api'
+import { ImageUpload } from './components/ImageUpload'
+import { UploadResults } from './components/UploadResults'
 import './App.css'
 
 function App() {
@@ -31,6 +33,15 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState(0)
+  const [uploadResults, setUploadResults] = useState<{
+    medical: UploadResponse[]
+    xray: UploadResponse[]
+    traffic: UploadResponse[]
+  }>({
+    medical: [],
+    xray: [],
+    traffic: []
+  })
 
   const kittiProgress = 75
 
@@ -79,8 +90,15 @@ function App() {
   }
 
   const handleRetry = () => {
-    setRetryCount(prev => prev + 1)
+    setRetryCount((prev: number) => prev + 1)
     loadData(true)
+  }
+
+  const handleUploadComplete = (category: 'medical' | 'xray' | 'traffic', results: UploadResponse[]) => {
+    setUploadResults(prev => ({
+      ...prev,
+      [category]: [...prev[category], ...results]
+    }))
   }
 
   useEffect(() => {
@@ -416,6 +434,19 @@ function App() {
                 </div>
               </CardContent>
             </Card>
+
+            <div className="space-y-6">
+              <ImageUpload
+                category="xray"
+                title="Upload X-ray Images"
+                description="Upload chest X-ray images for pneumonia detection analysis"
+                onUploadComplete={(results) => handleUploadComplete('xray', results)}
+              />
+              
+              {uploadResults.xray.length > 0 && (
+                <UploadResults results={uploadResults.xray} category="xray" />
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="tiny-imagenet" className="space-y-6">
@@ -515,6 +546,19 @@ function App() {
                 </div>
               </CardContent>
             </Card>
+
+            <div className="space-y-6">
+              <ImageUpload
+                category="traffic"
+                title="Upload Computer Vision Images"
+                description="Upload images for object recognition and computer vision analysis"
+                onUploadComplete={(results) => handleUploadComplete('traffic', results)}
+              />
+              
+              {uploadResults.traffic.length > 0 && (
+                <UploadResults results={uploadResults.traffic} category="traffic" />
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="kitti" className="space-y-6">
@@ -609,6 +653,19 @@ function App() {
                 </div>
               </CardContent>
             </Card>
+
+            <div className="space-y-6">
+              <ImageUpload
+                category="medical"
+                title="Upload Autonomous Driving Images"
+                description="Upload traffic and street scene images for autonomous driving analysis"
+                onUploadComplete={(results) => handleUploadComplete('medical', results)}
+              />
+              
+              {uploadResults.medical.length > 0 && (
+                <UploadResults results={uploadResults.medical} category="medical" />
+              )}
+            </div>
           </TabsContent>
         </Tabs>
       </main>
