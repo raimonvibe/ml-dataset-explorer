@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -17,26 +17,62 @@ import {
   Download,
   Users,
   FileImage,
-  Zap
+  Zap,
+  Loader2
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { apiService, type ChestXrayStats, type TinyImageNetStats } from './services/api'
 import './App.css'
 
 function App() {
   const [activeSection, setActiveSection] = useState('overview')
-
-  const chestXrayStats = [
-    { name: 'Normal', value: 1583, color: '#10b981' },
-    { name: 'Pneumonia', value: 4273, color: '#ef4444' }
-  ]
-
-  const tinyImageNetStats = [
-    { name: 'Training', value: 100000, color: '#3b82f6' },
-    { name: 'Validation', value: 10000, color: '#8b5cf6' },
-    { name: 'Test', value: 10000, color: '#f59e0b' }
-  ]
+  const [chestXrayStats, setChestXrayStats] = useState<ChestXrayStats | null>(null)
+  const [tinyImageNetStats, setTinyImageNetStats] = useState<TinyImageNetStats | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const kittiProgress = 75
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true)
+        const [chestXrayData, tinyImageNetData] = await Promise.all([
+          apiService.getChestXrayStatistics(),
+          apiService.getTinyImageNetStatistics()
+        ])
+        setChestXrayStats(chestXrayData)
+        setTinyImageNetStats(tinyImageNetData)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load data')
+        setChestXrayStats({
+          total_images: 5856,
+          normal_cases: 1583,
+          pneumonia_cases: 4273,
+          distribution: [
+            { name: 'Normal', value: 1583, color: '#10b981' },
+            { name: 'Pneumonia', value: 4273, color: '#ef4444' }
+          ]
+        })
+        setTinyImageNetStats({
+          total_images: 120000,
+          total_classes: 200,
+          training_images: 100000,
+          validation_images: 10000,
+          test_images: 10000,
+          distribution: [
+            { name: 'Training', value: 100000, color: '#3b82f6' },
+            { name: 'Validation', value: 10000, color: '#8b5cf6' },
+            { name: 'Test', value: 10000, color: '#f59e0b' }
+          ]
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadData()
+  }, [])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -63,6 +99,23 @@ function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">API Error</h3>
+                <div className="mt-2 text-sm text-red-700">
+                  <p>{error}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         <Tabs value={activeSection} onValueChange={setActiveSection} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4 lg:w-fit lg:grid-cols-4">
             <TabsTrigger value="overview" className="flex items-center space-x-2">
@@ -91,7 +144,9 @@ function App() {
                   <Heart className="h-4 w-4 text-red-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">5,856</div>
+                  <div className="text-2xl font-bold">
+                    {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : chestXrayStats?.total_images.toLocaleString() || '5,856'}
+                  </div>
                   <p className="text-xs text-muted-foreground">Chest X-ray images</p>
                   <div className="mt-4">
                     <img 
@@ -112,7 +167,9 @@ function App() {
                   <Brain className="h-4 w-4 text-blue-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">200</div>
+                  <div className="text-2xl font-bold">
+                    {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : tinyImageNetStats?.total_classes || '200'}
+                  </div>
                   <p className="text-xs text-muted-foreground">Object classes</p>
                   <div className="mt-4">
                     <img 
@@ -162,14 +219,18 @@ function App() {
                         <Heart className="h-4 w-4 text-red-500" />
                         <span className="text-sm">Chest X-ray</span>
                       </div>
-                      <Badge variant="outline">5.9K images</Badge>
+                      <Badge variant="outline">
+                        {loading ? '...' : `${(chestXrayStats?.total_images || 5856) / 1000}K images`}
+                      </Badge>
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
                         <Brain className="h-4 w-4 text-blue-500" />
                         <span className="text-sm">Tiny-ImageNet</span>
                       </div>
-                      <Badge variant="outline">120K images</Badge>
+                      <Badge variant="outline">
+                        {loading ? '...' : `${(tinyImageNetStats?.total_images || 120000) / 1000}K images`}
+                      </Badge>
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
@@ -194,7 +255,9 @@ function App() {
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Total Images</span>
-                      <span className="font-semibold">~126K</span>
+                      <span className="font-semibold">
+                        {loading ? '...' : `~${Math.round(((chestXrayStats?.total_images || 5856) + (tinyImageNetStats?.total_images || 120000)) / 1000)}K`}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Medical Classes</span>
@@ -202,7 +265,9 @@ function App() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Object Classes</span>
-                      <span className="font-semibold">200</span>
+                      <span className="font-semibold">
+                        {loading ? '...' : tinyImageNetStats?.total_classes || '200'}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Drive Sequences</span>
@@ -236,11 +301,15 @@ function App() {
                     />
                     <div className="grid grid-cols-2 gap-4">
                       <div className="text-center p-4 bg-green-50 rounded-lg">
-                        <div className="text-2xl font-bold text-green-600">1,583</div>
+                        <div className="text-2xl font-bold text-green-600">
+                          {loading ? <Loader2 className="h-6 w-6 animate-spin mx-auto" /> : chestXrayStats?.normal_cases.toLocaleString() || '1,583'}
+                        </div>
                         <div className="text-sm text-green-700">Normal Cases</div>
                       </div>
                       <div className="text-center p-4 bg-red-50 rounded-lg">
-                        <div className="text-2xl font-bold text-red-600">4,273</div>
+                        <div className="text-2xl font-bold text-red-600">
+                          {loading ? <Loader2 className="h-6 w-6 animate-spin mx-auto" /> : chestXrayStats?.pneumonia_cases.toLocaleString() || '4,273'}
+                        </div>
                         <div className="text-sm text-red-700">Pneumonia Cases</div>
                       </div>
                     </div>
@@ -255,23 +324,29 @@ function App() {
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={chestXrayStats}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {chestXrayStats.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
+                    {loading ? (
+                      <div className="flex items-center justify-center h-full">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                      </div>
+                    ) : (
+                      <PieChart>
+                        <Pie
+                          data={chestXrayStats?.distribution || []}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {(chestXrayStats?.distribution || []).map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    )}
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
@@ -289,7 +364,7 @@ function App() {
                   <div className="space-y-3">
                     <h4 className="font-semibold text-gray-900">Dataset Details</h4>
                     <ul className="space-y-2 text-sm text-gray-600">
-                      <li>• Total Images: 5,856</li>
+                      <li>• Total Images: {loading ? '...' : chestXrayStats?.total_images.toLocaleString() || '5,856'}</li>
                       <li>• Image Format: JPEG</li>
                       <li>• Source: Pediatric patients</li>
                       <li>• Quality Control: Expert physician graded</li>
@@ -331,7 +406,9 @@ function App() {
                     />
                     <div className="grid grid-cols-3 gap-3">
                       <div className="text-center p-3 bg-blue-50 rounded-lg">
-                        <div className="text-xl font-bold text-blue-600">200</div>
+                        <div className="text-xl font-bold text-blue-600">
+                        {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : tinyImageNetStats?.total_classes || '200'}
+                      </div>
                         <div className="text-xs text-blue-700">Classes</div>
                       </div>
                       <div className="text-center p-3 bg-purple-50 rounded-lg">
@@ -339,7 +416,9 @@ function App() {
                         <div className="text-xs text-purple-700">Resolution</div>
                       </div>
                       <div className="text-center p-3 bg-amber-50 rounded-lg">
-                        <div className="text-xl font-bold text-amber-600">120K</div>
+                        <div className="text-xl font-bold text-amber-600">
+                        {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : `${(tinyImageNetStats?.total_images || 120000) / 1000}K`}
+                      </div>
                         <div className="text-xs text-amber-700">Images</div>
                       </div>
                     </div>
@@ -354,13 +433,19 @@ function App() {
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={tinyImageNetStats}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="value" fill="#3b82f6" />
-                    </BarChart>
+                    {loading ? (
+                      <div className="flex items-center justify-center h-full">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                      </div>
+                    ) : (
+                      <BarChart data={tinyImageNetStats?.distribution || []}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="value" fill="#3b82f6" />
+                      </BarChart>
+                    )}
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
@@ -380,7 +465,7 @@ function App() {
                     <ul className="space-y-2 text-sm text-gray-600">
                       <li>• Image Size: 64×64 pixels</li>
                       <li>• Color Channels: RGB (3 channels)</li>
-                      <li>• Classes: 200 object categories</li>
+                      <li>• Classes: {loading ? '...' : tinyImageNetStats?.total_classes || '200'} object categories</li>
                       <li>• Training Images: 500 per class</li>
                     </ul>
                   </div>
