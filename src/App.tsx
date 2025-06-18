@@ -30,47 +30,60 @@ function App() {
   const [tinyImageNetStats, setTinyImageNetStats] = useState<TinyImageNetStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
 
   const kittiProgress = 75
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true)
-        const [chestXrayData, tinyImageNetData] = await Promise.all([
-          apiService.getChestXrayStatistics(),
-          apiService.getTinyImageNetStatistics()
-        ])
-        setChestXrayStats(chestXrayData)
-        setTinyImageNetStats(tinyImageNetData)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load data')
-        setChestXrayStats({
-          total_images: 5856,
-          normal_cases: 1583,
-          pneumonia_cases: 4273,
-          distribution: [
-            { name: 'Normal', value: 1583, color: '#10b981' },
-            { name: 'Pneumonia', value: 4273, color: '#ef4444' }
-          ]
-        })
-        setTinyImageNetStats({
-          total_images: 120000,
-          total_classes: 200,
-          training_images: 100000,
-          validation_images: 10000,
-          test_images: 10000,
-          distribution: [
-            { name: 'Training', value: 100000, color: '#3b82f6' },
-            { name: 'Validation', value: 10000, color: '#8b5cf6' },
-            { name: 'Test', value: 10000, color: '#f59e0b' }
-          ]
-        })
-      } finally {
-        setLoading(false)
+  const loadData = async (isRetry = false) => {
+    try {
+      setLoading(true)
+      if (isRetry) {
+        setError(null)
       }
+      const [chestXrayData, tinyImageNetData] = await Promise.all([
+        apiService.getChestXrayStatistics(),
+        apiService.getTinyImageNetStatistics()
+      ])
+      setChestXrayStats(chestXrayData)
+      setTinyImageNetStats(tinyImageNetData)
+      setError(null)
+      setRetryCount(0)
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load data'
+      setError(errorMessage)
+      console.error('API Error:', errorMessage)
+      setChestXrayStats({
+        total_images: 5856,
+        normal_cases: 1583,
+        pneumonia_cases: 4273,
+        distribution: [
+          { name: 'Normal', value: 1583, color: '#10b981' },
+          { name: 'Pneumonia', value: 4273, color: '#ef4444' }
+        ]
+      })
+      setTinyImageNetStats({
+        total_images: 120000,
+        total_classes: 200,
+        training_images: 100000,
+        validation_images: 10000,
+        test_images: 10000,
+        distribution: [
+          { name: 'Training', value: 100000, color: '#3b82f6' },
+          { name: 'Validation', value: 10000, color: '#8b5cf6' },
+          { name: 'Test', value: 10000, color: '#f59e0b' }
+        ]
+      })
+    } finally {
+      setLoading(false)
     }
+  }
 
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1)
+    loadData(true)
+  }
+
+  useEffect(() => {
     loadData()
   }, [])
 
@@ -101,17 +114,38 @@ function App() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">API Error</h3>
-                <div className="mt-2 text-sm text-red-700">
-                  <p>{error}</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
                 </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">API Connection Error</h3>
+                  <div className="mt-2 text-sm text-red-700">
+                    <p>{error}</p>
+                    {retryCount > 0 && (
+                      <p className="mt-1 text-xs">Retry attempt: {retryCount}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="ml-4">
+                <button
+                  onClick={handleRetry}
+                  disabled={loading}
+                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Retrying...
+                    </>
+                  ) : (
+                    'Retry'
+                  )}
+                </button>
               </div>
             </div>
           </div>
