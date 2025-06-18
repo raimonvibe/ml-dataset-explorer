@@ -42,3 +42,6 @@ backend/**/*.pyc
 backend/uploads/
 backend/alembic/versions/*.py
 !backend/alembic/versions/__init__.py
+
+# Vercel
+.vercel
